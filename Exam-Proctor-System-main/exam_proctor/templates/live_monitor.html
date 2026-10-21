@@ -1,0 +1,126 @@
+{% extends "base.html" %}
+{% block title %}Live Monitoring - Exam Proctoring System{% endblock %}
+{% block content %}
+
+<div class="row g-3">
+    <div class="col-lg-8">
+        <div class="card p-3">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5 class="fw-bold mb-0"><i class="bi bi-camera-video-fill text-danger"></i> Live Classroom Feed</h5>
+                <span class="badge {{ 'bg-success' if is_running else 'bg-secondary' }}" id="statusBadge">
+                    {{ 'MONITORING ACTIVE' if is_running else 'IDLE' }}
+                </span>
+            </div>
+            <!-- Cấu hình CSS inline trực tiếp cho video frame để đảm bảo hình ảnh hiển thị đẹp mắt -->
+            <div class="video-frame bg-black d-flex align-items-center justify-content-center overflow-hidden rounded" style="min-height: 400px; position: relative;">
+                {% if is_running %}
+                    <img src="{{ url_for('monitor.video_feed') }}" alt="Live feed" class="img-fluid w-100 style-video">
+                {% else %}
+                    <div class="text-light text-center p-4">
+                        <i class="bi bi-camera-video-off" style="font-size: 3rem;"></i>
+                        <p class="mt-2 mb-0 text-muted">No active monitoring session</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-4">
+        <div class="card p-3 mb-3">
+            <h6 class="fw-bold mb-3">Create Exam Session</h6>
+            <form method="POST" action="{{ url_for('monitor.create_exam') }}">
+                <div class="mb-2">
+                    <label class="form-label small">Exam Name</label>
+                    <input type="text" name="exam_name" class="form-control form-control-sm" required>
+                </div>
+                <div class="mb-2">
+                    <label class="form-label small">Subject</label>
+                    <input type="text" name="subject" class="form-control form-control-sm">
+                </div>
+                <div class="mb-2">
+                    <label class="form-label small">Room</label>
+                    <input type="text" name="room_name" class="form-control form-control-sm">
+                </div>
+                <div class="row g-2 mb-2">
+                    <div class="col">
+                        <label class="form-label small">Date</label>
+                        <input type="date" name="exam_date" class="form-control form-control-sm">
+                    </div>
+                </div>
+                <div class="row g-2 mb-3">
+                    <div class="col">
+                        <label class="form-label small">Start</label>
+                        <input type="time" name="start_time" class="form-control form-control-sm">
+                    </div>
+                    <div class="col">
+                        <label class="form-label small">End</label>
+                        <input type="time" name="end_time" class="form-control form-control-sm">
+                    </div>
+                </div>
+                <button type="submit" class="btn btn-sm btn-outline-primary w-100">Create Exam</button>
+            </form>
+        </div>
+
+        <div class="card p-3">
+            <h6 class="fw-bold mb-3">Monitoring Controls</h6>
+            {% if not is_running %}
+            <form id="startForm">
+                <div class="mb-2">
+                    <label class="form-label small">Select Exam</label>
+                    <select name="exam_id_select" id="examSelect" class="form-select form-select-sm" required>
+                        <option value="" disabled selected>Choose an exam...</option>
+                        {% for exam in exams %}
+                            <option value="{{ exam.id }}">{{ exam.exam_name }} ({{ exam.status if exam.status else 'Ready' }})</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label small">Camera Source</label>
+                    <input type="text" name="camera_source" class="form-control form-control-sm" placeholder="EHSEE0604.mp4 or 0 for webcam">
+                </div>
+                <button type="button" class="btn btn-success w-100" onclick="startMonitoring()">
+                    <i class="bi bi-play-fill"></i> Start Monitoring
+                </button>
+            </form>
+            {% else %}
+                <form method="POST" action="{{ url_for('monitor.stop_monitoring') }}">
+                    <button type="submit" class="btn btn-danger w-100">
+                        <i class="bi bi-stop-fill"></i> Stop Monitoring
+                    </button>
+                </form>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+function startMonitoring() {
+    const examSelect = document.getElementById('examSelect');
+    const examId = examSelect ? examSelect.value : null;
+    
+    if (!examId) { 
+        alert('Please select an exam before starting.'); 
+        return; 
+    }
+    
+    const cameraSourceInput = document.querySelector('[name=camera_source]');
+    const cameraSource = cameraSourceInput ? cameraSourceInput.value : '';
+
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = `/live/start/${examId}`;
+    
+    const input = document.createElement('input');
+    input.type = 'hidden'; 
+    input.name = 'camera_source'; 
+    input.value = cameraSource;
+    
+    form.appendChild(input);
+    document.body.appendChild(form);
+    form.submit();
+}
+</script>
+{% endblock %}

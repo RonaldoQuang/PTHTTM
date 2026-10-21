@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}Settings - Exam Proctoring System{% endblock %}
+{% block content %}
+
+<h3 class="fw-bold mb-4">Settings</h3>
+
+<div class="row g-3">
+    <div class="col-md-6">
+        <div class="card p-3">
+            <h6 class="fw-bold">General Settings</h6>
+            <form method="POST">
+                <input type="hidden" name="form_type" value="general">
+                <div class="mb-3">
+                    <label class="form-label small">Suspicion Alert Threshold</label>
+                    <input type="number" name="suspicion_threshold" class="form-control"
+                           value="{{ settings.get('suspicion_threshold', 15) }}">
+                    <div class="form-text">Score at which a student is highlighted and flagged.</div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label small">Default Camera Source</label>
+                    <input type="text" name="camera_source" class="form-control"
+                           value="{{ settings.get('camera_source', 0) }}">
+                    <div class="form-text">0 for default webcam, or an RTSP/HTTP URL for an IP camera.</div>
+                </div>
+                <button type="submit" class="btn btn-primary">Save Settings</button>
+            </form>
+        </div>
+    </div>
+
+    <div class="col-md-6">
+        <div class="card p-3">
+            <h6 class="fw-bold">Change Password</h6>
+            <form method="POST">
+                <input type="hidden" name="form_type" value="password">
+                <div class="mb-3">
+                    <label class="form-label small">New Password</label>
+                    <input type="password" name="new_password" class="form-control" minlength="6" required>
+                </div>
+                <button type="submit" class="btn btn-outline-primary">Update Password</button>
+            </form>
+        </div>
+    </div>
+</div>
+
+{% endblock %}

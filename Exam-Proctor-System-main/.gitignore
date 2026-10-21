@@ -1,0 +1,23 @@
+# Python virtual environments
+.venv/
+**/.venv/
+__pycache__/
+*.py[cod]
+
+# Databases
+*.db
+*.sqlite
+*.sqlite3
+
+# Local environment files
+.env
+
+# Ignore heavy models
+models/
+*.pt
+
+# Ignore video files anywhere in project
+*.MOV
+*.mov
+*.MP4
+*.mp4

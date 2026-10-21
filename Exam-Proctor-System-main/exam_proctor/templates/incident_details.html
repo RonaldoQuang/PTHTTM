@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% block title %}Incidents - Exam Proctoring System{% endblock %}
+{% block content %}
+
+<h3 class="fw-bold mb-4">Incident History</h3>
+
+<div class="card p-3 mb-3">
+    <form method="GET" class="row g-2">
+        <div class="col-md-3">
+            <label class="form-label small">Exam</label>
+            <select name="exam_id" class="form-select form-select-sm">
+                <option value="">All exams</option>
+                {% for exam in exams %}
+                    <option value="{{ exam.id }}" {% if filters.get('exam_id')|string == exam.id|string %}selected{% endif %}>{{ exam.exam_name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-2">
+            <label class="form-label small">Incident Type</label>
+            <select name="type" class="form-select form-select-sm">
+                <option value="">All types</option>
+                {% for t in ['looking_away','mobile_phone','standing','left_seat','object_passing','face_not_visible','close_interaction'] %}
+                    <option value="{{ t }}" {% if filters.get('type') == t %}selected{% endif %}>{{ t.replace('_',' ') }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-2">
+            <label class="form-label small">Track ID</label>
+            <input type="number" name="track_id" class="form-control form-control-sm" value="{{ filters.get('track_id','') }}">
+        </div>
+        <div class="col-md-2">
+            <label class="form-label small">From</label>
+            <input type="date" name="date_from" class="form-control form-control-sm" value="{{ filters.get('date_from','') }}">
+        </div>
+        <div class="col-md-2">
+            <label class="form-label small">To</label>
+            <input type="date" name="date_to" class="form-control form-control-sm" value="{{ filters.get('date_to','') }}">
+        </div>
+        <div class="col-md-1 d-flex align-items-end">
+            <button type="submit" class="btn btn-sm btn-primary w-100">Filter</button>
+        </div>
+    </form>
+</div>
+
+<div class="card p-3">
+    <div class="table-responsive">
+        <table class="table table-incidents align-middle">
+            <thead>
+                <tr>
+                    <th>Exam</th><th>Track</th><th>Type</th><th>Timestamp</th><th>Confidence</th><th>Description</th><th>Evidence</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for inc in incidents %}
+                <tr>
+                    <td>{{ inc.exam_name }}</td>
+                    <td>#{{ inc.tracker_id }}</td>
+                    <td><span class="badge bg-danger-subtle text-danger badge-incident">{{ inc.incident_type.replace('_',' ') }}</span></td>
+                    <td>{{ inc.timestamp }}</td>
+                    <td>{{ "%.0f"|format(inc.confidence * 100) }}%</td>
+                    <td class="small text-muted">{{ inc.description }}</td>
+                    <td>
+                        {% if inc.screenshot_path %}
+                            <a href="{{ url_for('static', filename=inc.screenshot_path) }}" target="_blank">
+                                <img src="{{ url_for('static', filename=inc.screenshot_path) }}" style="height:40px;border-radius:4px;">
+                            </a>
+                        {% else %}
+                            <span class="text-muted small">—</span>
+                        {% endif %}
+                    </td>
+                </tr>
+            {% else %}
+                <tr><td colspan="7" class="text-center text-muted py-4">No incidents match the current filters.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{% endblock %}

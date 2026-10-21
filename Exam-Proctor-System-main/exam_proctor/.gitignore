@@ -1,0 +1,16 @@
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+env/
+logs/
+database/proctor.db
+static/screenshots/*.jpg
+static/reports/*.pdf
+!static/screenshots/.gitkeep
+!static/reports/.gitkeep
+.env
+.DS_Store
+models/*.pt
+!models/.gitkeep

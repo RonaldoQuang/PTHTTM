@@ -1,0 +1,79 @@
+:root {
+    --brand-navy: #101b33;
+    --brand-navy-light: #16234a;
+    --brand-accent: #2f6fed;
+    --brand-danger: #e5484d;
+    --brand-success: #1fb27a;
+    --brand-warning: #f5a524;
+    --surface: #f7f8fb;
+}
+
+body {
+    background-color: var(--surface);
+    font-family: "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+
+.app-navbar {
+    background: linear-gradient(90deg, var(--brand-navy) 0%, var(--brand-navy-light) 100%);
+}
+
+.app-navbar .nav-link {
+    color: rgba(255, 255, 255, 0.75);
+}
+
+.app-navbar .nav-link.active,
+.app-navbar .nav-link:hover {
+    color: #fff;
+}
+
+.login-wrapper {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: radial-gradient(circle at top left, #16234a, #0a0f1f 70%);
+}
+
+.login-card {
+    width: 100%;
+    max-width: 400px;
+    border: none;
+    border-radius: 14px;
+    box-shadow: 0 20px 45px rgba(0, 0, 0, 0.35);
+}
+
+.stat-card {
+    border: none;
+    border-radius: 14px;
+    color: #fff;
+    padding: 1.25rem 1.5rem;
+    box-shadow: 0 8px 20px rgba(16, 27, 51, 0.12);
+}
+
+.stat-card .stat-value { font-size: 2rem; font-weight: 700; line-height: 1; }
+.stat-card .stat-label { font-size: 0.85rem; opacity: 0.85; }
+
+.stat-card.bg-students { background: linear-gradient(135deg, #2f6fed, #1c48b3); }
+.stat-card.bg-active { background: linear-gradient(135deg, #1fb27a, #148a5c); }
+.stat-card.bg-incidents { background: linear-gradient(135deg, #f5a524, #c9820f); }
+.stat-card.bg-flagged { background: linear-gradient(135deg, #e5484d, #b8262b); }
+
+.card { border: none; border-radius: 14px; box-shadow: 0 4px 14px rgba(16, 27, 51, 0.08); }
+
+.video-frame {
+    background: #000;
+    border-radius: 12px;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 420px;
+}
+
+.video-frame img { width: 100%; height: auto; display: block; }
+
+.badge-incident {
+    text-transform: capitalize;
+}
+
+.table-incidents th { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.03em; color: #6c7280; }

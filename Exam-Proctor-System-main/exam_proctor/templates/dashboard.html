@@ -1,0 +1,135 @@
+{% extends "base.html" %}
+{% block title %}Dashboard - Exam Proctoring System{% endblock %}
+{% block content %}
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h3 class="fw-bold mb-0">Dashboard</h3>
+        <p class="text-muted mb-0">Overview of all exam sessions and suspicious activity</p>
+    </div>
+    <a href="{{ url_for('monitor.live') }}" class="btn btn-primary">
+        <i class="bi bi-camera-video"></i> Go to Live Monitoring
+    </a>
+</div>
+
+<div class="row g-3 mb-4">
+    <div class="col-md-3">
+        <div class="stat-card bg-students">
+            <div class="stat-value">{{ total_tracks }}</div>
+            <div class="stat-label">Total Students Tracked</div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="stat-card bg-active">
+            <div class="stat-value">{{ live_stats.active_tracks if live_stats else 0 }}</div>
+            <div class="stat-label">Currently Active Tracks</div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="stat-card bg-incidents">
+            <div class="stat-value">{{ total_incidents }}</div>
+            <div class="stat-label">Total Suspicious Events</div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="stat-card bg-flagged">
+            <div class="stat-value">{{ flagged_tracks }}</div>
+            <div class="stat-label">Flagged Students</div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-3 mb-4">
+    <div class="col-md-6">
+        <div class="card p-3 h-100">
+            <h6 class="fw-bold">Incidents by Type</h6>
+            <canvas id="incidentTypeChart" height="180"></canvas>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card p-3 h-100">
+            <h6 class="fw-bold">Daily Incident Trend (last 14 days)</h6>
+            <canvas id="dailyTrendChart" height="180"></canvas>
+        </div>
+    </div>
+</div>
+
+<div class="row g-3">
+    <div class="col-md-7">
+        <div class="card p-3">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <h6 class="fw-bold mb-0">Recent Alerts</h6>
+                <a href="{{ url_for('dashboard.incidents') }}" class="small">View all incidents &rarr;</a>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-sm table-incidents align-middle mb-0">
+                    <thead><tr><th>Exam</th><th>Track</th><th>Type</th><th>Time</th><th>Confidence</th></tr></thead>
+                    <tbody>
+                    {% for inc in recent_incidents %}
+                        <tr>
+                            <td>{{ inc.exam_name }}</td>
+                            <td>#{{ inc.tracker_id }}</td>
+                            <td><span class="badge bg-danger-subtle text-danger badge-incident">{{ inc.incident_type.replace('_',' ') }}</span></td>
+                            <td>{{ inc.timestamp }}</td>
+                            <td>{{ "%.0f"|format(inc.confidence * 100) }}%</td>
+                        </tr>
+                    {% else %}
+                        <tr><td colspan="5" class="text-center text-muted py-3">No incidents recorded yet.</td></tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-5">
+        <div class="card p-3">
+            <h6 class="fw-bold mb-3">Recent Exams</h6>
+            {% for exam in exams %}
+                <div class="d-flex justify-content-between align-items-center border-bottom py-2">
+                    <div>
+                        <div class="fw-semibold">{{ exam.exam_name }}</div>
+                        <div class="text-muted small">{{ exam.room_name }} &middot; {{ exam.exam_date }}</div>
+                    </div>
+                    <span class="badge bg-{{ 'success' if exam.status=='running' else ('secondary' if exam.status=='scheduled' else 'dark') }}">
+                        {{ exam.status }}
+                    </span>
+                </div>
+            {% else %}
+                <p class="text-muted mb-0">No exams created yet.</p>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+async function loadCharts() {
+    const typeRes = await fetch("{{ url_for('dashboard.chart_incident_types') }}");
+    const typeData = await typeRes.json();
+    new Chart(document.getElementById('incidentTypeChart'), {
+        type: 'doughnut',
+        data: {
+            labels: Object.keys(typeData).map(k => k.replaceAll('_',' ')),
+            datasets: [{ data: Object.values(typeData),
+                backgroundColor: ['#2f6fed','#e5484d','#f5a524','#1fb27a','#8f5ee6','#0aa2c0','#e07a5f'] }]
+        },
+        options: { plugins: { legend: { position: 'bottom' } } }
+    });
+
+    const dailyRes = await fetch("{{ url_for('dashboard.chart_daily') }}");
+    const dailyData = await dailyRes.json();
+    new Chart(document.getElementById('dailyTrendChart'), {
+        type: 'line',
+        data: {
+            labels: dailyData.labels,
+            datasets: [{ label: 'Incidents', data: dailyData.counts,
+                borderColor: '#2f6fed', backgroundColor: 'rgba(47,111,237,0.15)', fill: true, tension: 0.3 }]
+        },
+        options: { plugins: { legend: { display: false } } }
+    });
+}
+loadCharts();
+</script>
+{% endblock %}
