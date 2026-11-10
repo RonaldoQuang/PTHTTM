@@ -1,0 +1,149 @@
+{% extends "base.html" %}
+{% from "_macros.html" import incident_badge, evidence_attrs, evidence_thumb %}
+{% block title %}Tổng quan - Hệ thống giám sát thi{% endblock %}
+{% block content %}
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h3 class="fw-bold mb-0">Tổng quan</h3>
+        <p class="text-muted mb-0">Tổng quan các kỳ thi và hoạt động đáng ngờ</p>
+    </div>
+    {% if is_monitoring %}
+    <a href="{{ url_for('monitor.live') }}" class="btn btn-danger d-inline-flex align-items-center gap-2 shadow-sm">
+        <span class="live-dot-mini"></span>
+        <span>Đang giám sát: <strong>{{ active_exam_name }}</strong> &middot; Xem camera</span>
+    </a>
+    {% else %}
+    <a href="{{ url_for('monitor.live') }}" class="btn btn-primary">
+        <i class="bi bi-camera-video"></i> Đến trang giám sát trực tiếp
+    </a>
+    {% endif %}
+</div>
+
+<div class="row g-3 mb-4">
+    <div class="col-md-3">
+        <div class="stat-card bg-students">
+            <div class="stat-value">{{ total_tracks }}</div>
+            <div class="stat-label">Tổng số thí sinh được theo dõi</div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="stat-card bg-active">
+            <div class="stat-value">{{ live_stats.active_tracks if live_stats else 0 }}</div>
+            <div class="stat-label">Thí sinh đang theo dõi</div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="stat-card bg-incidents">
+            <div class="stat-value">{{ total_incidents }}</div>
+            <div class="stat-label">Tổng số sự kiện đáng ngờ</div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="stat-card bg-flagged">
+            <div class="stat-value">{{ flagged_tracks }}</div>
+            <div class="stat-label">Thí sinh bị gắn cờ</div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-3 mb-4">
+    <div class="col-md-6">
+        <div class="card p-3 h-100">
+            <h6 class="fw-bold">Sự cố theo loại</h6>
+            <canvas id="incidentTypeChart" height="180"></canvas>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card p-3 h-100">
+            <h6 class="fw-bold">Xu hướng sự cố theo ngày (14 ngày gần nhất)</h6>
+            <canvas id="dailyTrendChart" height="180"></canvas>
+        </div>
+    </div>
+</div>
+
+<div class="row g-3">
+    <div class="col-md-7">
+        <div class="card p-3">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <h6 class="fw-bold mb-0">Cảnh báo gần đây</h6>
+                <a href="{{ url_for('dashboard.incidents') }}" class="btn-view-all">
+                    <span>Xem tất cả sự cố</span>
+                    <i class="bi bi-arrow-right"></i>
+                </a>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-sm table-incidents align-middle mb-0">
+                    <thead><tr><th>Kỳ thi</th><th>Mã theo dõi</th><th>Loại</th><th>Thời gian</th><th>Độ tin cậy</th><th>Bằng chứng</th></tr></thead>
+                    <tbody data-ev-group>
+                    {% for inc in recent_incidents %}
+                        {% set img = url_for('static', filename=inc.screenshot_path|replace('\\', '/')) if inc.screenshot_path else '' %}
+                        <tr {{ evidence_attrs(inc, img) }}>
+                            <td>{{ inc.exam_name }}</td>
+                            <td>#{{ inc.tracker_id }}</td>
+                            <td>{{ incident_badge(inc.incident_type) }}</td>
+                            <td>{{ inc.timestamp|vn_datetime }}</td>
+                            <td>{{ "%.0f"|format((inc.confidence or 0) * 100) }}%</td>
+                            <td>{{ evidence_thumb(img) }}</td>
+                        </tr>
+                    {% else %}
+                        <tr><td colspan="6" class="text-center text-muted py-3">Chưa có sự cố nào được ghi nhận.</td></tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-5">
+        <div class="card p-3">
+            <h6 class="fw-bold mb-3">Kỳ thi gần đây</h6>
+            {% for exam in exams %}
+                <div class="d-flex justify-content-between align-items-center border-bottom py-2">
+                    <div>
+                        <div class="fw-semibold">{{ exam.exam_name }}</div>
+                        <div class="text-muted small">{{ exam.room_name }} &middot; {{ exam.exam_date|vn_datetime }}</div>
+                    </div>
+                    <span class="badge bg-{{ 'success' if exam.status=='running' else ('secondary' if exam.status=='scheduled' else 'dark') }}">
+                        {{ exam.status|status_label }}
+                    </span>
+                </div>
+            {% else %}
+                <p class="text-muted mb-0">Chưa có kỳ thi nào.</p>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+const INCIDENT_LABELS = {{ INCIDENT_LABELS|tojson }};
+async function loadCharts() {
+    const typeRes = await fetch("{{ url_for('dashboard.chart_incident_types') }}");
+    const typeData = await typeRes.json();
+    new Chart(document.getElementById('incidentTypeChart'), {
+        type: 'doughnut',
+        data: {
+            labels: Object.keys(typeData).map(k => INCIDENT_LABELS[k.toLowerCase().replaceAll(' ','_')] || k.replaceAll('_',' ')),
+            datasets: [{ data: Object.values(typeData),
+                backgroundColor: ['#2f6fed','#e5484d','#f5a524','#1fb27a','#8f5ee6','#0aa2c0','#e07a5f'] }]
+        },
+        options: { plugins: { legend: { position: 'bottom' } } }
+    });
+
+    const dailyRes = await fetch("{{ url_for('dashboard.chart_daily') }}");
+    const dailyData = await dailyRes.json();
+    new Chart(document.getElementById('dailyTrendChart'), {
+        type: 'line',
+        data: {
+            labels: dailyData.labels.map(d => d.split('-').reverse().join('/')),
+            datasets: [{ label: 'Số sự cố', data: dailyData.counts,
+                borderColor: '#2f6fed', backgroundColor: 'rgba(47,111,237,0.15)', fill: true, tension: 0.3 }]
+        },
+        options: { plugins: { legend: { display: false } } }
+    });
+}
+loadCharts();
+</script>
+{% endblock %}

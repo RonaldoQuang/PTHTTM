@@ -1,0 +1,32 @@
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+venv/
+.venv/
+.env
+
+# Dữ liệu chạy (có thể chứa hình ảnh thí sinh -> KHÔNG đưa lên GitHub)
+database/proctor.db
+uploads/*
+!uploads/.gitkeep
+static/screenshots/*
+static/reports/*
+!static/screenshots/.gitkeep
+!static/reports/.gitkeep
+logs/
+
+# Kết quả đánh giá / bộ dữ liệu tạm
+predictions.csv
+review.html
+dataset_for_roboflow*
+*.zip
+
+# Model OpenVINO sinh ra từ export_openvino.py (chạy lại là có)
+models/*_openvino_model/
+
+# Video
+*.mp4
+*.mov
+*.avi
+*.mkv

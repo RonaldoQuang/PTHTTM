@@ -1,0 +1,344 @@
+{% extends "base.html" %}
+{% block title %}Giám sát trực tiếp - Hệ thống giám sát thi{% endblock %}
+{% block content %}
+
+{% set pre_exam = request.args.get('exam_id')|int(0) %}
+
+<div class="row g-3">
+    <div class="col-lg-8">
+        <div class="card p-3">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5 class="fw-bold mb-0"><i class="bi bi-camera-video-fill text-danger"></i> Hình ảnh phòng thi trực tiếp</h5>
+                <span class="badge {{ 'bg-success' if is_running else 'bg-secondary' }}" id="statusBadge">
+                    {{ 'ĐANG GIÁM SÁT' if is_running else 'CHƯA HOẠT ĐỘNG' }}
+                </span>
+            </div>
+
+            <div class="video-frame position-relative" id="videoFrame">
+                {% if is_running %}
+                    <img id="liveStream" class="live-img" src="{{ url_for('monitor.video_feed') }}" alt="Hình ảnh trực tiếp">
+                    <button type="button" class="btn btn-dark btn-sm video-fs" id="fsBtn" title="Toàn màn hình" aria-label="Toàn màn hình">
+                        <i class="bi bi-arrows-fullscreen"></i>
+                    </button>
+                    <div class="video-overlay" id="streamLoading">
+                        <div class="spinner-border text-light" role="status"></div>
+                        <div>Đang kết nối camera...</div>
+                    </div>
+                    <div class="video-overlay" id="streamError" hidden>
+                        <i class="bi bi-wifi-off" style="font-size:2.5rem"></i>
+                        <div>Mất kết nối hình ảnh từ camera</div>
+                        <button type="button" class="btn btn-light btn-sm" id="reconnectBtn"><i class="bi bi-arrow-clockwise"></i> Kết nối lại</button>
+                    </div>
+                {% else %}
+                    <div class="text-light text-center p-4">
+                        <i class="bi bi-camera-video-off" style="font-size: 3rem;"></i>
+                        <p class="mt-2 mb-1">Chưa có phiên giám sát nào đang chạy</p>
+                        <p class="small text-secondary mb-0">Chọn kỳ thi và nguồn camera ở bên phải rồi bấm “Bắt đầu giám sát”.</p>
+                    </div>
+                {% endif %}
+            </div>
+
+            {% if is_running %}
+            <div class="live-stats mt-3">
+                <span><i class="bi bi-speedometer2"></i> Tốc độ AI: <strong id="statFps">–</strong> FPS</span>
+                <span><i class="bi bi-people"></i> Đang theo dõi: <strong id="statTracks">–</strong> thí sinh</span>
+                <span class="text-muted ms-auto" id="statNote"></span>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="col-lg-4">
+        {% if is_running %}
+        <div class="card p-3 mb-3">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <h6 class="fw-bold mb-0">Cảnh báo mới nhất</h6>
+                <div class="d-flex align-items-center gap-2">
+                    <button type="button" class="btn btn-outline-secondary btn-sm btn-action-pill" id="clearIncidentsBtn" title="Làm mới và xóa danh sách cảnh báo của kỳ thi này">
+                        <i class="bi bi-arrow-clockwise"></i> Làm mới
+                    </button>
+                    <a href="{{ url_for('dashboard.incidents', exam_id=active_exam_id) }}" class="btn-view-all">
+                        <span>Xem tất cả</span>
+                        <i class="bi bi-arrow-right"></i>
+                    </a>
+                </div>
+            </div>
+            <div id="recentList" data-ev-group>
+                <div class="text-muted small py-3 text-center">Chưa có cảnh báo nào.</div>
+            </div>
+        </div>
+        {% endif %}
+
+        <div class="card p-3 mb-3">
+            <h6 class="fw-bold mb-3">Điều khiển giám sát</h6>
+            {% if not is_running %}
+            <form id="startForm" method="POST" enctype="multipart/form-data" onsubmit="return false;">
+                <div class="mb-2">
+                    <label class="form-label small fw-semibold">Chọn kỳ thi</label>
+                    <select name="exam_id_select" id="examSelect" class="form-select form-select-sm" required>
+                        <option value="" disabled {% if not pre_exam %}selected{% endif %}>Chọn một kỳ thi...</option>
+                        {% for exam in exams %}
+                            <option value="{{ exam.id }}" {% if exam.id == pre_exam %}selected{% endif %}>{{ exam.exam_name }} ({{ exam.status|status_label if exam.status else 'Sẵn sàng' }})</option>
+                        {% endfor %}
+                    </select>
+                    <div class="invalid-feedback">Vui lòng chọn kỳ thi trước khi bắt đầu.</div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label small fw-semibold">Nguồn video / Camera</label>
+                    <div class="input-group input-group-sm mb-1">
+                        <input type="file" name="video_file" id="videoFileInput" class="form-control" accept="video/mp4,video/avi,video/mov,video/mkv,.mp4,.avi,.mov,.mkv">
+                        <button class="btn btn-outline-secondary d-none" type="button" id="clearFileBtn" title="Hủy chọn video">
+                            <i class="bi bi-x-lg"></i>
+                        </button>
+                    </div>
+                    <div id="fileSelectedBadge" class="d-none small text-success fw-semibold mt-1">
+                        <i class="bi bi-check-circle-fill me-1"></i> Sử dụng video từ máy tính: <span id="selectedFileName" class="text-break"></span>
+                    </div>
+                </div>
+                <button type="button" id="startBtn" class="btn btn-success w-100" data-loading="Đang tải..." onclick="startMonitoring()">
+                    <i class="bi bi-play-fill"></i> Bắt đầu giám sát
+                </button>
+            </form>
+            {% else %}
+                <form method="POST" action="{{ url_for('monitor.stop_monitoring') }}">
+                    <button type="submit" class="btn btn-danger w-100" data-loading="Đang dừng...">
+                        <i class="bi bi-stop-fill"></i> Dừng giám sát
+                    </button>
+                </form>
+            {% endif %}
+        </div>
+
+        {% if not is_running %}
+        <div class="card p-3">
+            <h6 class="fw-bold mb-3">Tạo kỳ thi</h6>
+            <form method="POST" action="{{ url_for('monitor.create_exam') }}">
+                <div class="mb-2">
+                    <label class="form-label small">Tên kỳ thi</label>
+                    <input type="text" name="exam_name" class="form-control form-control-sm" required>
+                </div>
+                <div class="mb-2">
+                    <label class="form-label small">Môn học</label>
+                    <input type="text" name="subject" class="form-control form-control-sm">
+                </div>
+                <div class="mb-2">
+                    <label class="form-label small">Phòng thi</label>
+                    <input type="text" name="room_name" class="form-control form-control-sm">
+                </div>
+                <div class="row g-2 mb-2">
+                    <div class="col">
+                        <label class="form-label small">Ngày thi</label>
+                        <input type="date" name="exam_date" class="form-control form-control-sm">
+                    </div>
+                </div>
+                <div class="row g-2 mb-3">
+                    <div class="col">
+                        <label class="form-label small">Giờ bắt đầu</label>
+                        <input type="time" name="start_time" class="form-control form-control-sm">
+                    </div>
+                    <div class="col">
+                        <label class="form-label small">Giờ kết thúc</label>
+                        <input type="time" name="end_time" class="form-control form-control-sm">
+                    </div>
+                </div>
+                <button type="submit" class="btn btn-sm btn-outline-primary w-100" data-loading="Đang tạo...">Tạo kỳ thi</button>
+            </form>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+/* ---------- Bắt đầu giám sát ---------- */
+function startMonitoring() {
+    var sel = document.getElementById('examSelect');
+    if (!sel || !sel.value) {
+        if (sel) { sel.classList.add('is-invalid'); sel.focus(); }
+        return;
+    }
+    sel.classList.remove('is-invalid');
+
+    var btn = document.getElementById('startBtn');
+    if (typeof setButtonLoading === 'function') {
+        setButtonLoading(btn);   // nạp model AI có thể mất vài giây, tránh bấm lặp
+    }
+
+    var form = document.getElementById('startForm');
+    form.action = '/live/start/' + encodeURIComponent(sel.value);
+    form.submit();
+}
+
+(function () {
+    var sel = document.getElementById('examSelect');
+    if (sel) sel.addEventListener('change', function () { sel.classList.remove('is-invalid'); });
+
+    var fileInput = document.getElementById('videoFileInput');
+    var clearBtn = document.getElementById('clearFileBtn');
+    var fileSelectedBadge = document.getElementById('fileSelectedBadge');
+    var selectedFileName = document.getElementById('selectedFileName');
+
+    if (fileInput) {
+        fileInput.addEventListener('change', function () {
+            if (fileInput.files && fileInput.files.length > 0) {
+                var file = fileInput.files[0];
+                selectedFileName.textContent = file.name;
+                fileSelectedBadge.classList.remove('d-none');
+                if (clearBtn) clearBtn.classList.remove('d-none');
+            } else {
+                fileSelectedBadge.classList.add('d-none');
+                if (clearBtn) clearBtn.classList.add('d-none');
+            }
+        });
+    }
+
+    if (clearBtn) {
+        clearBtn.addEventListener('click', function () {
+            if (fileInput) fileInput.value = '';
+            fileSelectedBadge.classList.add('d-none');
+            clearBtn.classList.add('d-none');
+        });
+    }
+})();
+
+{% if is_running %}
+/* ---------- Khi đang giám sát ---------- */
+(function () {
+    var img = document.getElementById('liveStream');
+    var loading = document.getElementById('streamLoading');
+    var errBox = document.getElementById('streamError');
+    var frame = document.getElementById('videoFrame');
+    var streamUrl = img.getAttribute('src');
+    var loadTimer = null;
+
+    function hideLoading() { loading.hidden = true; clearTimeout(loadTimer); }
+    img.addEventListener('load', hideLoading);
+    img.addEventListener('error', function () { hideLoading(); errBox.hidden = false; });
+    loadTimer = setTimeout(hideLoading, 6000);   // không để lớp "đang kết nối" che hình quá lâu
+
+    document.getElementById('reconnectBtn').addEventListener('click', function () {
+        errBox.hidden = true;
+        loading.hidden = false;
+        img.src = streamUrl + (streamUrl.indexOf('?') > -1 ? '&' : '?') + 't=' + Date.now();
+        loadTimer = setTimeout(hideLoading, 6000);
+    });
+
+    document.getElementById('fsBtn').addEventListener('click', function () {
+        if (document.fullscreenElement) document.exitFullscreen();
+        else if (frame.requestFullscreen) frame.requestFullscreen();
+    });
+
+    /* Thống kê trực tiếp (2 giây/lần) */
+    var fps = document.getElementById('statFps'), tracks = document.getElementById('statTracks'), note = document.getElementById('statNote');
+    function pollStats() {
+        fetch('{{ url_for("dashboard.live_stats") }}', { credentials: 'same-origin' })
+            .then(function (r) { return r.json(); })
+            .then(function (d) {
+                if (d.active === false) {
+                    note.textContent = 'Phiên giám sát đã dừng — hãy tải lại trang.';
+                    document.getElementById('statusBadge').className = 'badge bg-secondary';
+                    document.getElementById('statusBadge').textContent = 'CHƯA HOẠT ĐỘNG';
+                    return;
+                }
+                fps.textContent = d.fps > 0 ? d.fps : '–';   // 5 giây đầu chưa có số liệu
+                tracks.textContent = d.active_tracks != null ? d.active_tracks : '–';
+                note.textContent = '';
+            })
+            .catch(function () { note.textContent = 'Mất kết nối tới máy chủ…'; });
+    }
+    pollStats();
+    setInterval(pollStats, 2000);
+
+    /* Cảnh báo mới nhất (3 giây/lần): bấm vào để xem ảnh bằng chứng ngay trên trang */
+    var list = document.getElementById('recentList');
+    var seen = null;
+    var url = '{{ url_for("dashboard.recent_incidents", limit=8, exam_id=active_exam_id) }}';
+
+    function el(tag, cls, text) {
+        var n = document.createElement(tag);
+        if (cls) n.className = cls;
+        if (text != null) n.textContent = text;
+        return n;
+    }
+
+    function renderRecent(items) {
+        var firstLoad = seen === null;
+        if (firstLoad) seen = new Set();
+        list.textContent = '';
+        if (!items.length) {
+            list.appendChild(el('div', 'text-muted small py-3 text-center', 'Chưa có cảnh báo nào.'));
+            return;
+        }
+        items.forEach(function (it) {
+            var row = el('div', 'live-alert' + (!firstLoad && !seen.has(it.id) ? ' is-new' : ''));
+            seen.add(it.id);
+            row.setAttribute('data-evidence', '');
+            row.tabIndex = 0;
+            row.setAttribute('role', 'button');
+            row.title = 'Bấm để xem ảnh bằng chứng';
+            row.dataset.evSrc = it.image || '';
+            row.dataset.evExam = it.exam || '';
+            row.dataset.evTrack = it.track;
+            row.dataset.evType = it.type;
+            row.dataset.evSev = it.severity;
+            row.dataset.evTime = it.time;
+            row.dataset.evConf = it.confidence;
+            row.dataset.evDesc = it.description;
+
+            var thumb = el('span', 'ev-thumb' + (it.image ? '' : ' is-missing'));
+            if (it.image) {
+                var im = el('img', 'ev-thumb-img');
+                im.loading = 'lazy';
+                im.alt = 'Ảnh bằng chứng';
+                im.src = it.image;
+                thumb.appendChild(im);
+            }
+            thumb.appendChild(el('span', 'ev-missing', it.image ? 'Ảnh đã mất' : 'Không có ảnh'));
+            row.appendChild(thumb);
+
+            var body = el('div', 'live-alert-body');
+            body.appendChild(el('span', 'badge bg-' + it.severity + '-subtle text-' + it.severity + '-emphasis border border-' + it.severity + '-subtle', it.type));
+            body.appendChild(el('div', 'small', '#' + it.track + ' · ' + it.time + ' · ' + it.confidence + '%'));
+            row.appendChild(body);
+            list.appendChild(row);
+        });
+    }
+
+    function pollRecent() {
+        var fetchUrl = url + (url.indexOf('?') > -1 ? '&' : '?') + '_t=' + Date.now();
+        fetch(fetchUrl, { credentials: 'same-origin', cache: 'no-store' })
+            .then(function (r) { return r.json(); })
+            .then(renderRecent)
+            .catch(function () {});
+    }
+    pollRecent();
+    setInterval(pollRecent, 3000);
+
+    var clearBtn = document.getElementById('clearIncidentsBtn');
+    if (clearBtn) {
+        clearBtn.addEventListener('click', function () {
+            if (!confirm('Bạn có chắc chắn muốn làm mới danh sách cảnh báo của phiên giám sát này không?')) return;
+            clearBtn.disabled = true;
+            fetch('/live/clear-incidents/{{ active_exam_id }}', {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: { 'X-Requested-With': 'XMLHttpRequest' }
+            })
+            .then(function (r) { return r.json(); })
+            .then(function (res) {
+                clearBtn.disabled = false;
+                if (res.success) {
+                    seen = new Set();
+                    renderRecent([]);
+                }
+            })
+            .catch(function () {
+                clearBtn.disabled = false;
+            });
+        });
+    }
+})();
+{% endif %}
+</script>
+{% endblock %}

@@ -1,0 +1,9 @@
+# Cấu hình ByteTrack cho giám sát phòng thi (dùng thay cho bytetrack.yaml mặc định).
+# Mục tiêu: giữ nguyên ID của mỗi thí sinh, tránh bị cấp ID mới liên tục khi bị che hoặc khi AI xử lý chậm.
+tracker_type: bytetrack
+track_high_thresh: 0.25   # detection >= ngưỡng này được ghép ở lượt 1 (hạ xuống để bắt người ở xa)
+track_low_thresh: 0.12   # detection yếu hơn nhưng >= ngưỡng này chỉ dùng để giữ ID khi bị che
+new_track_thresh: 0.25    # cấp ID mới khi detection đạt ngưỡng (cho phép người ở xa được cấp track ID)
+track_buffer: 45         # số frame giữ ID khi tạm thời mất dấu (45 frame ~ 3-4 giây, cân bằng tốc độ)
+match_thresh: 0.8
+fuse_score: True

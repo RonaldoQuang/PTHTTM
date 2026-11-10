@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block title %}Báo cáo - Hệ thống giám sát thi{% endblock %}
+{% block content %}
+
+<h3 class="fw-bold mb-4">Báo cáo kỳ thi</h3>
+
+<div class="card p-3 mb-4">
+    <h6 class="fw-bold">Tạo báo cáo mới</h6>
+    <div class="table-responsive">
+        <table class="table table-sm align-middle">
+            <thead><tr><th>Kỳ thi</th><th>Ngày thi</th><th>Trạng thái</th><th></th></tr></thead>
+            <tbody>
+            {% for exam in exams %}
+                <tr>
+                    <td>{{ exam.exam_name }}</td>
+                    <td>{{ exam.exam_date|vn_datetime }}</td>
+                    <td><span class="badge bg-{{ 'success' if exam.status=='running' else ('secondary' if exam.status=='scheduled' else 'dark') }}">{{ exam.status|status_label }}</span></td>
+                    <td>
+                        <form method="POST" action="{{ url_for('report.generate', exam_id=exam.id) }}">
+                            <button type="submit" class="btn btn-sm btn-outline-primary" data-loading="Đang tạo PDF...">
+                                <i class="bi bi-file-earmark-plus"></i> Tạo PDF
+                            </button>
+                        </form>
+                    </td>
+                </tr>
+            {% else %}
+                <tr><td colspan="4" class="text-center text-muted py-3">Không tìm thấy kỳ thi nào.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="card p-3">
+    <h6 class="fw-bold">Báo cáo đã tạo</h6>
+    <div class="table-responsive">
+        <table class="table table-sm align-middle">
+            <thead><tr><th>Kỳ thi</th><th>Thời gian tạo</th><th>Tóm tắt</th><th></th></tr></thead>
+            <tbody>
+            {% for r in reports %}
+                <tr>
+                    <td>{{ r.exam_name }}</td>
+                    <td>{{ r.generated_at|vn_datetime }}</td>
+                    <td class="small text-muted">{{ r.summary }}</td>
+                    <td>
+                        <a class="btn btn-sm btn-outline-success" href="{{ url_for('report.download', filename=(r.file_path|replace('\\', '/')).split('/')[-1]) }}">
+                            <i class="bi bi-download"></i> Tải xuống
+                        </a>
+                    </td>
+                </tr>
+            {% else %}
+                <tr><td colspan="4" class="text-center text-muted py-3">Chưa có báo cáo nào được tạo.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{% endblock %}

@@ -1,0 +1,357 @@
+{% extends "base.html" %}
+{% from "_macros.html" import incident_badge, evidence_attrs, evidence_thumb %}
+{% block title %}Sự cố - Hệ thống giám sát thi{% endblock %}
+{% block content %}
+
+{% set has_filter = filters.values()|select|list|length > 0 %}
+
+<div class="d-flex justify-content-between align-items-end flex-wrap gap-2 mb-3">
+    <div>
+        <h3 class="fw-bold mb-0">Lịch sử sự cố</h3>
+        <p class="text-muted small mb-0">Bấm vào một dòng để xem ảnh bằng chứng ngay trên trang.</p>
+    </div>
+    <div class="text-muted small">
+        Hiển thị <strong id="totalIncidentsCount">{{ incidents|length }}</strong> sự cố{% if incidents|length >= 500 %} mới nhất (tối đa 500){% endif %}
+        {% if is_monitoring %}
+            <span class="badge bg-success-subtle text-success border border-success-subtle ms-2"><i class="bi bi-arrow-repeat"></i> Tự động cập nhật</span>
+        {% endif %}
+    </div>
+</div>
+
+<div class="card p-3 mb-3 filter-bar">
+    <form method="GET" class="row g-2">
+        <div class="col-md-3">
+            <label class="form-label small">Kỳ thi</label>
+            <select name="exam_id" class="form-select form-select-sm" onchange="this.form.submit()">
+                <option value="">Tất cả kỳ thi</option>
+                {% for exam in exams %}
+                    <option value="{{ exam.id }}" {% if filters.get('exam_id')|string == exam.id|string %}selected{% endif %}>{{ exam.exam_name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-2">
+            <label class="form-label small">Loại sự cố</label>
+            <select name="type" class="form-select form-select-sm" onchange="this.form.submit()">
+                <option value="">Tất cả loại</option>
+                {% for t in ['QUAY DAU','CUI GAM MAT','CUI DAU THAP','GIO TAY CAO','NAM RA BAN','DUNG DAY','cheat_paper','laptop','looking_away','mobile_phone','standing','left_seat','object_passing','face_not_visible','close_interaction'] %}
+                    <option value="{{ t }}" {% if filters.get('type') == t %}selected{% endif %}>{{ t|incident_label }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-2">
+            <label class="form-label small">Mã theo dõi</label>
+            <input type="number" name="track_id" min="0" class="form-control form-control-sm" value="{{ filters.get('track_id','') }}" placeholder="vd. 4">
+        </div>
+        <div class="col-md-2">
+            <label class="form-label small">Từ ngày</label>
+            <input type="date" name="date_from" class="form-control form-control-sm" value="{{ filters.get('date_from','') }}">
+        </div>
+        <div class="col-md-2">
+            <label class="form-label small">Đến ngày</label>
+            <input type="date" name="date_to" class="form-control form-control-sm" value="{{ filters.get('date_to','') }}">
+        </div>
+        <div class="col-md-1 d-flex align-items-end">
+            <button type="submit" class="btn btn-sm btn-primary w-100">Lọc</button>
+        </div>
+    </form>
+    {% if has_filter %}
+    <div class="mt-2">
+        <a href="{{ url_for('dashboard.incidents') }}" class="small"><i class="bi bi-x-circle"></i> Xóa bộ lọc</a>
+    </div>
+    {% endif %}
+</div>
+
+<div class="card p-3">
+    <div class="table-responsive">
+        <table class="table table-incidents table-hover align-middle mb-0">
+            <thead>
+                <tr>
+                    <th>Kỳ thi</th><th>Mã theo dõi</th><th>Loại</th><th>Thời gian</th><th>Độ tin cậy</th><th>Mô tả</th><th>Bằng chứng</th><th>Xác nhận</th>
+                </tr>
+            </thead>
+            <tbody id="incidentsTbody" data-ev-group>
+            {% for inc in incidents %}
+                {% set img = url_for('static', filename=inc.screenshot_path|replace('\\', '/')) if inc.screenshot_path else '' %}
+                {% set pct = ((inc.confidence or 0) * 100)|round|int %}
+                <tr data-incident-id="{{ inc.id }}" {{ evidence_attrs(inc, img) }}>
+                    <td>{{ inc.exam_name }}</td>
+                    <td>#{{ inc.tracker_id }}</td>
+                    <td>{{ incident_badge(inc.incident_type) }}</td>
+                    <td>{{ inc.timestamp|vn_datetime }}</td>
+                    <td>
+                        <div class="conf-cell">
+                            <div class="progress" role="progressbar" aria-label="Độ tin cậy" aria-valuenow="{{ pct }}" aria-valuemin="0" aria-valuemax="100"><div class="progress-bar" style="width: {{ pct }}%"></div></div>
+                            <span class="small">{{ pct }}%</span>
+                        </div>
+                    </td>
+                    <td class="small text-muted">{{ inc.description }}</td>
+                    <td>{{ evidence_thumb(img) }}</td>
+                    <td class="text-nowrap">
+                        {% set rs = inc.review_status or 'pending' %}
+                        {% if rs == 'confirmed' %}<span class="badge text-bg-danger">Đã xác nhận</span>
+                        {% elif rs == 'false_alarm' %}<span class="badge text-bg-secondary">Báo nhầm</span>
+                        {% else %}<span class="badge text-bg-light border">Chờ xem</span>{% endif %}
+                        <form method="post" action="{{ url_for('dashboard.review_incident', incident_id=inc.id) }}" class="d-inline">
+                            <button name="status" value="confirmed" class="btn btn-sm btn-outline-danger py-0" title="Đúng là vi phạm" {% if rs == 'confirmed' %}disabled{% endif %}>Đúng</button>
+                            <button name="status" value="false_alarm" class="btn btn-sm btn-outline-secondary py-0" title="AI báo nhầm" {% if rs == 'false_alarm' %}disabled{% endif %}>Nhầm</button>
+                        </form>
+                    </td>
+                </tr>
+            {% else %}
+                <tr id="emptyRow"><td colspan="8" class="text-center text-muted py-5">
+                    <i class="bi bi-inbox" style="font-size:2rem"></i>
+                    <div class="mt-2">Không có sự cố nào khớp với bộ lọc.</div>
+                </td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{% if is_monitoring %}
+<!-- Khung camera nổi (Picture-in-Picture) -->
+<div id="livePipWidget" class="live-pip-widget card shadow-lg">
+    <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center py-2 px-3" id="pipHeader" style="cursor: pointer;">
+        <div class="d-flex align-items-center gap-2 text-truncate me-2">
+            <span class="live-pulse-dot"></span>
+            <span class="fw-semibold small text-truncate" title="{{ active_exam_name }}">Live: {{ active_exam_name }}</span>
+        </div>
+        <div class="d-flex align-items-center gap-1 flex-shrink-0">
+            <button type="button" class="btn btn-sm btn-outline-light py-0 px-1 border-0" id="pipMinimizeBtn" title="Thu nhỏ/Mở rộng">
+                <i class="bi bi-dash-lg" id="pipMinIcon"></i>
+            </button>
+            <a href="{{ url_for('monitor.live') }}" class="btn btn-sm btn-outline-light py-0 px-1 border-0" title="Đến phòng giám sát trực tiếp">
+                <i class="bi bi-arrows-angle-expand"></i>
+            </a>
+            <button type="button" class="btn btn-sm btn-outline-light py-0 px-1 border-0" id="pipCloseBtn" title="Đóng khung nổi">
+                <i class="bi bi-x-lg"></i>
+            </button>
+        </div>
+    </div>
+    <div class="card-body p-0 position-relative bg-black" id="pipBody">
+        <img id="pipLiveStream" src="{{ url_for('monitor.video_feed') }}" alt="Camera trực tiếp" class="w-100 d-block" style="max-height: 200px; object-fit: contain;">
+        <div class="pip-stats-bar">
+            <span><i class="bi bi-people"></i> <strong id="pipTracks">–</strong> TS</span>
+            <span><i class="bi bi-speedometer2"></i> <strong id="pipFps">–</strong> FPS</span>
+        </div>
+    </div>
+</div>
+
+<!-- Nút mở lại camera nổi khi người dùng bấm đóng -->
+<button type="button" id="pipReopenBtn" class="btn btn-primary shadow-lg live-pip-reopen-btn d-none">
+    <span class="live-pulse-dot me-1"></span> <i class="bi bi-camera-video me-1"></i> Mở Camera trực tiếp
+</button>
+{% endif %}
+
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+(function() {
+    'use strict';
+
+    /* ---------- 1. Quản lý Khung Camera Nổi (Picture-in-Picture) ---------- */
+    var pipWidget = document.getElementById('livePipWidget');
+    var pipMinimizeBtn = document.getElementById('pipMinimizeBtn');
+    var pipMinIcon = document.getElementById('pipMinIcon');
+    var pipCloseBtn = document.getElementById('pipCloseBtn');
+    var pipReopenBtn = document.getElementById('pipReopenBtn');
+    var pipTracks = document.getElementById('pipTracks');
+    var pipFps = document.getElementById('pipFps');
+
+    if (pipWidget) {
+        if (pipMinimizeBtn) {
+            pipMinimizeBtn.addEventListener('click', function(e) {
+                e.stopPropagation();
+                pipWidget.classList.toggle('is-minimized');
+                if (pipMinIcon) {
+                    if (pipWidget.classList.contains('is-minimized')) {
+                        pipMinIcon.className = 'bi bi-square';
+                        pipMinimizeBtn.title = 'Mở rộng khung';
+                    } else {
+                        pipMinIcon.className = 'bi bi-dash-lg';
+                        pipMinimizeBtn.title = 'Thu nhỏ khung';
+                    }
+                }
+            });
+        }
+
+        if (pipCloseBtn) {
+            pipCloseBtn.addEventListener('click', function(e) {
+                e.stopPropagation();
+                pipWidget.classList.add('d-none');
+                if (pipReopenBtn) pipReopenBtn.classList.remove('d-none');
+            });
+        }
+
+        if (pipReopenBtn) {
+            pipReopenBtn.addEventListener('click', function() {
+                pipWidget.classList.remove('d-none');
+                pipReopenBtn.classList.add('d-none');
+            });
+        }
+
+        /* Cập nhật thông số FPS / Số TS của camera nổi (mỗi 2.5 giây) */
+        function updatePipStats() {
+            fetch('{{ url_for("dashboard.live_stats") }}', { credentials: 'same-origin' })
+                .then(function(r) { return r.json(); })
+                .then(function(d) {
+                    if (d.active === false) {
+                        pipWidget.classList.add('d-none');
+                        if (pipReopenBtn) pipReopenBtn.classList.add('d-none');
+                        return;
+                    }
+                    if (pipTracks && d.active_tracks != null) pipTracks.textContent = d.active_tracks;
+                    if (pipFps && d.fps != null) pipFps.textContent = d.fps;
+                })
+                .catch(function() {});
+        }
+        updatePipStats();
+        setInterval(updatePipStats, 2500);
+    }
+
+    /* ---------- 2. Tự động cập nhật bảng sự cố theo thời gian thực ---------- */
+    var tbody = document.getElementById('incidentsTbody');
+    var totalCountEl = document.getElementById('totalIncidentsCount');
+    if (!tbody) return;
+
+    // Tìm id sự cố lớn nhất đang có trong bảng
+    var lastMaxId = 0;
+    var rows = tbody.querySelectorAll('tr[data-incident-id]');
+    rows.forEach(function(r) {
+        var id = parseInt(r.getAttribute('data-incident-id'), 10);
+        if (!isNaN(id) && id > lastMaxId) lastMaxId = id;
+    });
+
+    var currentExamId = "{{ filters.get('exam_id', '') }}";
+    var currentType = "{{ filters.get('type', '') }}";
+    var currentTrack = "{{ filters.get('track_id', '') }}";
+
+    function pollNewIncidents() {
+        var url = '{{ url_for("dashboard.recent_incidents") }}?after_id=' + lastMaxId + '&limit=50';
+        if (currentExamId) url += '&exam_id=' + encodeURIComponent(currentExamId);
+
+        fetch(url, { credentials: 'same-origin', cache: 'no-store' })
+            .then(function(r) { return r.json(); })
+            .then(function(items) {
+                if (!items || !items.length) return;
+
+                // Xóa hàng "Không có sự cố nào khớp" nếu đang hiển thị
+                var emptyRow = document.getElementById('emptyRow');
+                if (emptyRow) emptyRow.remove();
+
+                var addedCount = 0;
+                items.forEach(function(it) {
+                    // Cập nhật lastMaxId
+                    if (it.id > lastMaxId) lastMaxId = it.id;
+
+                    // Nếu người dùng đang lọc loại sự cố hoặc mã TS trên trang
+                    if (currentType && it.raw_type !== currentType) return;
+                    if (currentTrack && String(it.track) !== String(currentTrack)) return;
+
+                    var tr = document.createElement('tr');
+                    tr.setAttribute('data-incident-id', it.id);
+                    tr.setAttribute('data-evidence', '');
+                    tr.setAttribute('data-ev-src', it.image || '');
+                    tr.setAttribute('data-ev-exam', it.exam || '');
+                    tr.setAttribute('data-ev-track', it.track != null ? it.track : '');
+                    tr.setAttribute('data-ev-type', it.type || '');
+                    tr.setAttribute('data-ev-sev', it.severity || 'secondary');
+                    tr.setAttribute('data-ev-time', it.time || '');
+                    tr.setAttribute('data-ev-conf', it.confidence != null ? it.confidence : '');
+                    tr.setAttribute('data-ev-desc', it.description || '');
+                    tr.className = 'row-new-highlight';
+
+                    // Cột 1: Kỳ thi
+                    var tdExam = document.createElement('td');
+                    tdExam.textContent = it.exam || '—';
+                    tr.appendChild(tdExam);
+
+                    // Cột 2: Mã theo dõi
+                    var tdTrack = document.createElement('td');
+                    tdTrack.textContent = '#' + (it.track != null ? it.track : '—');
+                    tr.appendChild(tdTrack);
+
+                    // Cột 3: Loại sự cố
+                    var tdType = document.createElement('td');
+                    var spanBadge = document.createElement('span');
+                    spanBadge.className = 'badge badge-incident bg-' + it.severity + '-subtle text-' + it.severity + '-emphasis border border-' + it.severity + '-subtle';
+                    spanBadge.textContent = it.type;
+                    tdType.appendChild(spanBadge);
+                    tr.appendChild(tdType);
+
+                    // Cột 4: Thời gian
+                    var tdTime = document.createElement('td');
+                    tdTime.textContent = it.time;
+                    tr.appendChild(tdTime);
+
+                    // Cột 5: Độ tin cậy
+                    var tdConf = document.createElement('td');
+                    var confCell = document.createElement('div');
+                    confCell.className = 'conf-cell';
+                    confCell.innerHTML = '<div class="progress" role="progressbar" aria-valuenow="' + it.confidence + '" aria-valuemin="0" aria-valuemax="100">' +
+                                         '<div class="progress-bar" style="width: ' + it.confidence + '%"></div></div>' +
+                                         '<span class="small">' + it.confidence + '%</span>';
+                    tdConf.appendChild(confCell);
+                    tr.appendChild(tdConf);
+
+                    // Cột 6: Mô tả
+                    var tdDesc = document.createElement('td');
+                    tdDesc.className = 'small text-muted';
+                    tdDesc.textContent = it.description;
+                    tr.appendChild(tdDesc);
+
+                    // Cột 7: Bằng chứng
+                    var tdEv = document.createElement('td');
+                    var thumb = document.createElement('span');
+                    thumb.className = 'ev-thumb' + (it.image ? '' : ' is-missing');
+                    if (it.image) {
+                        var im = document.createElement('img');
+                        im.className = 'ev-thumb-img';
+                        im.loading = 'lazy';
+                        im.alt = 'Bằng chứng';
+                        im.src = it.image;
+                        thumb.appendChild(im);
+                    }
+                    var missSpan = document.createElement('span');
+                    missSpan.className = 'ev-missing';
+                    missSpan.textContent = it.image ? 'Ảnh đã mất' : 'Không có ảnh';
+                    thumb.appendChild(missSpan);
+                    tdEv.appendChild(thumb);
+                    tr.appendChild(tdEv);
+
+                    // Cột 8: Xác nhận
+                    var tdReview = document.createElement('td');
+                    tdReview.className = 'text-nowrap';
+                    var rsBadge = document.createElement('span');
+                    rsBadge.className = 'badge text-bg-light border';
+                    rsBadge.textContent = 'Chờ xem';
+                    tdReview.appendChild(rsBadge);
+
+                    var form = document.createElement('form');
+                    form.method = 'post';
+                    form.action = '/incidents/' + it.id + '/review';
+                    form.className = 'd-inline ms-1';
+                    form.innerHTML = '<button name="status" value="confirmed" class="btn btn-sm btn-outline-danger py-0" title="Đúng là vi phạm">Đúng</button> ' +
+                                     '<button name="status" value="false_alarm" class="btn btn-sm btn-outline-secondary py-0" title="AI báo nhầm">Nhầm</button>';
+                    tdReview.appendChild(form);
+                    tr.appendChild(tdReview);
+
+                    // Chèn hàng mới lên đầu bảng
+                    tbody.insertBefore(tr, tbody.firstChild);
+                    addedCount++;
+                });
+
+                if (addedCount > 0 && totalCountEl) {
+                    var cur = parseInt(totalCountEl.textContent, 10) || 0;
+                    totalCountEl.textContent = cur + addedCount;
+                }
+            })
+            .catch(function() {});
+    }
+
+    // Tự động kiểm tra sự cố mới mỗi 2.5 giây
+    setInterval(pollNewIncidents, 2500);
+})();
+</script>
+{% endblock %}

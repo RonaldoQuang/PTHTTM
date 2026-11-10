@@ -1,0 +1,20 @@
+{# Thành phần giao diện dùng chung #}
+
+{% macro incident_badge(type) -%}
+{% set sev = type|incident_severity -%}
+<span class="badge bg-{{ sev }}-subtle text-{{ sev }}-emphasis border border-{{ sev }}-subtle badge-incident">{{ type|incident_label }}</span>
+{%- endmacro %}
+
+{# Thuộc tính để một dòng/ô bấm vào là mở cửa sổ xem ảnh bằng chứng #}
+{% macro evidence_attrs(inc, image_url) -%}
+data-evidence tabindex="0" role="button" title="Bấm để xem ảnh bằng chứng" data-ev-src="{{ image_url }}" data-ev-exam="{{ inc.exam_name }}" data-ev-track="{{ inc.tracker_id }}" data-ev-type="{{ inc.incident_type|incident_label }}" data-ev-sev="{{ inc.incident_type|incident_severity }}" data-ev-time="{{ inc.timestamp|vn_datetime }}" data-ev-conf="{{ '%.0f'|format((inc.confidence or 0) * 100) }}" data-ev-desc="{{ inc.description or '' }}"
+{%- endmacro %}
+
+{# Ảnh thu nhỏ; nếu file ảnh không còn thì hiện ô "Ảnh đã mất" #}
+{% macro evidence_thumb(image_url) -%}
+{% if image_url -%}
+<span class="ev-thumb"><img class="ev-thumb-img" loading="lazy" decoding="async" src="{{ image_url }}" alt="Ảnh bằng chứng"><span class="ev-missing"><i class="bi bi-image"></i>Ảnh đã mất</span></span>
+{%- else -%}
+<span class="ev-thumb is-missing"><span class="ev-missing"><i class="bi bi-image"></i>Không có ảnh</span></span>
+{%- endif %}
+{%- endmacro %}

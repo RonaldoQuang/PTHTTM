@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}Cài đặt - Hệ thống giám sát thi{% endblock %}
+{% block content %}
+
+<h3 class="fw-bold mb-4">Cài đặt</h3>
+
+<div class="row g-3">
+    <div class="col-md-6">
+        <div class="card p-3">
+            <h6 class="fw-bold">Cài đặt chung</h6>
+            <form method="POST">
+                <input type="hidden" name="form_type" value="general">
+                <div class="mb-3">
+                    <label class="form-label small">Ngưỡng cảnh báo nghi ngờ</label>
+                    <input type="number" name="suspicion_threshold" class="form-control"
+                           value="{{ settings.get('suspicion_threshold', 15) }}">
+                    <div class="form-text">Mức điểm mà tại đó thí sinh bị đánh dấu và gắn cờ.</div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label small">Nguồn camera mặc định</label>
+                    <input type="text" name="camera_source" class="form-control"
+                           value="{{ settings.get('camera_source', 0) }}">
+                    <div class="form-text">0 cho webcam mặc định, hoặc URL RTSP/HTTP cho camera IP (ví dụ camera điện thoại).</div>
+                </div>
+                <button type="submit" class="btn btn-primary" data-loading="Đang lưu...">Lưu cài đặt</button>
+            </form>
+        </div>
+    </div>
+
+    <div class="col-md-6">
+        <div class="card p-3">
+            <h6 class="fw-bold">Đổi mật khẩu</h6>
+            <form method="POST">
+                <input type="hidden" name="form_type" value="password">
+                <div class="mb-3">
+                    <label class="form-label small">Mật khẩu mới</label>
+                    <input type="password" name="new_password" class="form-control" minlength="6" required>
+                </div>
+                <button type="submit" class="btn btn-outline-primary" data-loading="Đang cập nhật...">Cập nhật mật khẩu</button>
+            </form>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
